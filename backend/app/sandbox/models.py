@@ -50,8 +50,33 @@ class Reservation(BaseModel):
     idempotency_key: Optional[str] = None
 
 
+class PaymentStatus(str, Enum):
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class PaymentCreateRequest(BaseModel):
+    reservation_id: str
+    amount: float
+    payment_method: str = "CARD"
+    idempotency_key: Optional[str] = None
+
+
+class PaymentTransaction(BaseModel):
+    payment_id: str
+    reservation_id: str
+    amount: float
+    currency: str = "INR"
+    status: PaymentStatus = PaymentStatus.COMPLETED
+    payment_method: str = "CARD"
+    created_at: str
+    idempotency_key: Optional[str] = None
+
+
 class SandboxStateSnapshot(BaseModel):
     scenario: ScenarioConfig
     total_reservations: int
     reservations: List[Reservation]
     flight_seats: Dict[str, int]
+    total_payments: int = 0
+    payments: List[PaymentTransaction] = Field(default_factory=list)

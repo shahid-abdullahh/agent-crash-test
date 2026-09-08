@@ -154,3 +154,80 @@ export interface RunComparison {
   remediation_effective: boolean;
   key_findings: string[];
 }
+
+export interface ReadinessFinding {
+  category: string;
+  status: 'PASS' | 'WARN' | 'INFO';
+  title: string;
+  detail: string;
+}
+
+export interface OperationDefinition {
+  operation_id: string;
+  method: string;
+  path: string;
+  summary?: string;
+  description?: string;
+  parameters: any[];
+  request_body_schema?: any;
+  response_schemas: any;
+  state_changing: boolean;
+  idempotency_supported: boolean;
+  generated_tool_name: string;
+}
+
+export interface Integration {
+  id: string;
+  name: string;
+  description?: string;
+  version: string;
+  base_url: string;
+  spec_type: string;
+  operations: OperationDefinition[];
+  schemas: Record<string, any>;
+  generated_tools_count: number;
+  readiness_findings: ReadinessFinding[];
+  status: string;
+  created_at: string;
+}
+
+export interface ConnectorDefinition {
+  id: string;
+  name: string;
+  integration_id: string;
+  auth_type: string;
+  base_url: string;
+  operations_count: number;
+  operations: string[];
+  status: 'CONNECTED' | 'READY_FOR_TESTING' | 'TESTED';
+  metadata: Record<string, any>;
+}
+
+export interface EndpointDoc {
+  operation_id: string;
+  method: string;
+  path: string;
+  summary: string;
+  description: string;
+  parameters: any[];
+  request_example?: any;
+  response_examples: Record<string, any>;
+  state_changing: boolean;
+  agent_guidance: string;
+  recovery_considerations: string;
+}
+
+export interface APIDocumentation {
+  integration_id: string;
+  title: string;
+  version: string;
+  base_url: string;
+  overview: string;
+  auth_summary: string;
+  endpoints: EndpointDoc[];
+  agent_usage_rules: string[];
+  failure_and_recovery_guide: string[];
+  markdown_content: string;
+  generated_at: string;
+}
+

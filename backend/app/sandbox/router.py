@@ -4,6 +4,8 @@ from app.sandbox.models import (
     Flight,
     Reservation,
     ReservationCreateRequest,
+    PaymentTransaction,
+    PaymentCreateRequest,
     ScenarioConfig,
     SandboxStateSnapshot,
 )
@@ -38,6 +40,18 @@ def create_reservation(payload: ReservationCreateRequest):
 def get_reservation(reservation_id: str):
     """Get reservation details by reservation ID."""
     return sandbox_state.get_reservation(reservation_id)
+
+
+@router.post("/payments", response_model=PaymentTransaction, operation_id="create_payment")
+def create_payment(payload: PaymentCreateRequest):
+    """Process a payment for an existing flight reservation."""
+    return sandbox_state.create_payment(payload)
+
+
+@router.get("/payments/{payment_id}", response_model=PaymentTransaction, operation_id="get_payment")
+def get_payment(payment_id: str):
+    """Get payment transaction details."""
+    return sandbox_state.get_payment(payment_id)
 
 
 @router.get("/state", response_model=SandboxStateSnapshot)

@@ -84,6 +84,37 @@ class ApiService {
   async getComparison(baselineRunId: string, remediatedRunId: string): Promise<any> {
     return this.request(`/comparison?baseline_run_id=${baselineRunId}&remediated_run_id=${remediatedRunId}`);
   }
+
+  async getIntegrations(): Promise<any[]> {
+    return this.request('/integrations');
+  }
+
+  async getIntegration(id: string): Promise<any> {
+    return this.request(`/integrations/${id}`);
+  }
+
+  async importIntegration(payload: { name: string; spec_url?: string; spec_content?: string }): Promise<any> {
+    return this.request('/integrations', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getIntegrationCode(id: string): Promise<Record<string, string>> {
+    return this.request(`/integrations/${id}/code`);
+  }
+
+  async getConnectors(): Promise<any[]> {
+    return this.request('/connectors');
+  }
+
+  async getDocumentation(integrationId: string): Promise<any> {
+    return this.request(`/documentation/${integrationId}`);
+  }
+
+  async resetDemoEnvironment(): Promise<any> {
+    return this.request('/admin/demo/reset', { method: 'POST' });
+  }
 }
 
 export const api = new ApiService();

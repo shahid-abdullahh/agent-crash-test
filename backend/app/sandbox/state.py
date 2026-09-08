@@ -7,6 +7,9 @@ from app.sandbox.models import (
     Reservation,
     ReservationCreateRequest,
     ReservationStatus,
+    PaymentTransaction,
+    PaymentCreateRequest,
+    PaymentStatus,
     ScenarioConfig,
     ScenarioMode,
     SandboxStateSnapshot,
@@ -78,12 +81,14 @@ class SandboxState:
     def __init__(self):
         self.flights: Dict[str, Flight] = get_default_flights()
         self.reservations: Dict[str, Reservation] = {}
+        self.payments: Dict[str, PaymentTransaction] = {}
         self.scenario: ScenarioConfig = ScenarioConfig()
         self.history: List[dict] = []
 
     def reset(self):
         self.flights = get_default_flights()
         self.reservations = {}
+        self.payments = {}
         self.scenario = ScenarioConfig()
         self.history = []
 
@@ -175,12 +180,52 @@ class SandboxState:
             raise HTTPException(status_code=404, detail=f"Reservation {reservation_id} not found")
         return self.reservations[reservation_id]
 
+    def create_payment(self, req: PaymentCreateRequest) -> PaymentTransaction:
+        if req.reservation_id not in self.reservations:
+            raise HTTPException(status_code=404, detail=f"Reservation {req.reservation_id} not found")
+
+        # Idempotency check for payment
+        if req.idempotency_key:
+            for existing in self.payments.values():
+                if existing.idempotency_key == req.idempotency_key:
+                    return existing
+
+        pay_id = f"PAY-{len(self.payments) + 1:04d}"
+        now_str = datetime.now(timezone.utc).isoformat()
+        payment = PaymentTransaction(
+            payment_id=pay_id,
+            reservation_id=req.reservation_id,
+            amount=req.amount,
+            currency="INR",
+            status=PaymentStatus.COMPLETED,
+            payment_method=req.payment_method,
+            created_at=now_str,
+            idempotency_key=req.idempotency_key,
+        )
+        self.payments[pay_id] = payment
+
+        self.history.append({
+            "action": "create_payment",
+            "payment_id": pay_id,
+            "reservation_id": req.reservation_id,
+            "amount": req.amount,
+            "timestamp": now_str,
+        })
+        return payment
+
+    def get_payment(self, payment_id: str) -> PaymentTransaction:
+        if payment_id not in self.payments:
+            raise HTTPException(status_code=404, detail=f"Payment {payment_id} not found")
+        return self.payments[payment_id]
+
     def get_snapshot(self) -> SandboxStateSnapshot:
         return SandboxStateSnapshot(
             scenario=self.scenario,
             total_reservations=len(self.reservations),
             reservations=list(self.reservations.values()),
             flight_seats={f_id: f.available_seats for f_id, f in self.flights.items()},
+            total_payments=len(self.payments),
+            payments=list(self.payments.values()),
         )
 
 
