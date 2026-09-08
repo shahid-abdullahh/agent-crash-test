@@ -6,75 +6,70 @@ from app.schemas.trace import TraceEventType, HTTPPayload
 
 
 class ToolDefinition:
-    def __init__(self, name: str, description: str, parameters: Dict[str, Any]):
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        parameters: Dict[str, Any],
+        method: str = "GET",
+        path: str = "",
+        path_param_names: Optional[List[str]] = None,
+        query_param_names: Optional[List[str]] = None,
+        request_body_schema: Optional[Dict[str, Any]] = None,
+    ):
         self.name = name
         self.description = description
         self.parameters = parameters
+        self.method = method.upper()
+        self.path = path
+        self.path_param_names = path_param_names or []
+        self.query_param_names = query_param_names or []
+        self.request_body_schema = request_body_schema
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "name": self.name,
             "description": self.description,
+            "method": self.method,
+            "path": self.path,
             "parameters": self.parameters,
+            "path_param_names": self.path_param_names,
+            "query_param_names": self.query_param_names,
+            "request_body_schema": self.request_body_schema,
         }
 
 
 def get_travel_tools() -> List[ToolDefinition]:
-    return [
-        ToolDefinition(
-            name="search_flights",
-            description="Search available flights by origin, destination, and/or max_price.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "origin": {"type": "string", "description": "Origin airport code, e.g. DEL"},
-                    "destination": {"type": "string", "description": "Destination airport code, e.g. BOM"},
-                    "max_price": {"type": "number", "description": "Maximum price in INR"},
-                },
-            },
-        ),
-        ToolDefinition(
-            name="get_flight",
-            description="Get details of a specific flight by flight_id.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "flight_id": {"type": "string", "description": "Flight ID, e.g. FL-101"},
-                },
-                "required": ["flight_id"],
-            },
-        ),
-        ToolDefinition(
-            name="create_reservation",
-            description="Book a seat on a flight for a passenger.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "flight_id": {"type": "string", "description": "Flight ID"},
-                    "passenger_name": {"type": "string", "description": "Passenger full name"},
-                    "idempotency_key": {"type": "string", "description": "Optional unique client key to prevent duplicate booking on retries"},
-                },
-                "required": ["flight_id", "passenger_name"],
-            },
-        ),
-        ToolDefinition(
-            name="get_reservation",
-            description="Retrieve an existing reservation by reservation_id.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "reservation_id": {"type": "string", "description": "Reservation ID, e.g. RES-0001"},
-                },
-                "required": ["reservation_id"],
-            },
-        ),
-    ]
+    """Generate standardized travel tools dynamically from FastAPI sandbox OpenAPI spec."""
+    from app.main import app
+    from app.openapi.generator import OpenAPIToolGenerator
+
+    # Generate tools directly from the live OpenAPI schema
+    generator = OpenAPIToolGenerator(app.openapi())
+    tools = generator.generate_tools(path_prefix="/sandbox")
+    
+    # Filter out administrative sandbox state endpoints (reset, configure, state)
+    # Keeping the domain business operations for the agent
+    allowed_operations = {"search_flights", "get_flight", "create_reservation", "get_reservation"}
+    return [t for t in tools if t.name in allowed_operations]
 
 
 class ToolExecutor:
-    def __init__(self, base_url: str, client: Optional[httpx.AsyncClient] = None):
+    """Executes OpenAPI-driven ToolDefinitions via real HTTP requests."""
+
+    def __init__(
+        self,
+        base_url: str,
+        client: Optional[httpx.AsyncClient] = None,
+        tools: Optional[List[ToolDefinition]] = None,
+    ):
         self.base_url = base_url.rstrip("/")
         self.client = client
+        self.tools_map: Dict[str, ToolDefinition] = {t.name: t for t in (tools or [])}
+
+    def register_tools(self, tools: List[ToolDefinition]):
+        for tool in tools:
+            self.tools_map[tool.name] = tool
 
     async def execute(
         self,
@@ -89,39 +84,66 @@ class ToolExecutor:
             tool_arguments=arguments,
         )
 
-        # Map tool to HTTP endpoint
-        method = "GET"
-        endpoint = ""
-        params = {}
-        json_body = None
+        # Dynamic tool resolution
+        tool_def = self.tools_map.get(tool_name)
+        if tool_def:
+            method = tool_def.method
+            endpoint = tool_def.path
 
-        if tool_name == "search_flights":
-            method = "GET"
-            endpoint = "/sandbox/flights"
-            params = {k: v for k, v in arguments.items() if v is not None}
-        elif tool_name == "get_flight":
-            flight_id = arguments.get("flight_id", "")
-            method = "GET"
-            endpoint = f"/sandbox/flights/{flight_id}"
-        elif tool_name == "create_reservation":
-            method = "POST"
-            endpoint = "/sandbox/reservations"
-            json_body = {
-                "flight_id": arguments.get("flight_id"),
-                "passenger_name": arguments.get("passenger_name"),
-                "idempotency_key": arguments.get("idempotency_key"),
-            }
-        elif tool_name == "get_reservation":
-            reservation_id = arguments.get("reservation_id", "")
-            method = "GET"
-            endpoint = f"/sandbox/reservations/{reservation_id}"
+            # Format path parameters (e.g. /sandbox/flights/{flight_id})
+            params = {}
+            json_body = {}
+            for k, v in arguments.items():
+                if v is None:
+                    continue
+                if k in tool_def.path_param_names:
+                    endpoint = endpoint.replace(f"{{{k}}}", str(v))
+                elif k in tool_def.query_param_names:
+                    params[k] = v
+                else:
+                    json_body[k] = v
+
+            if method == "GET" and not params and json_body:
+                # If GET and parameters weren't explicitly marked query, treat non-path args as query
+                params = json_body
+                json_body = None
+            elif method != "GET" and not json_body:
+                json_body = None
         else:
-            err_msg = f"Unknown tool: {tool_name}"
-            trace_collector.add_event(
-                event_type=TraceEventType.ERROR,
-                error_message=err_msg,
-            )
-            return {"error": err_msg, "status_code": 400}
+            # Fallback mapping for backward compatibility if tool not in registry
+            if tool_name == "search_flights":
+                method = "GET"
+                endpoint = "/sandbox/flights"
+                params = {k: v for k, v in arguments.items() if v is not None}
+                json_body = None
+            elif tool_name == "get_flight":
+                flight_id = arguments.get("flight_id", "")
+                method = "GET"
+                endpoint = f"/sandbox/flights/{flight_id}"
+                params = {}
+                json_body = None
+            elif tool_name == "create_reservation":
+                method = "POST"
+                endpoint = "/sandbox/reservations"
+                params = {}
+                json_body = {
+                    "flight_id": arguments.get("flight_id"),
+                    "passenger_name": arguments.get("passenger_name"),
+                    "idempotency_key": arguments.get("idempotency_key"),
+                }
+            elif tool_name == "get_reservation":
+                reservation_id = arguments.get("reservation_id", "")
+                method = "GET"
+                endpoint = f"/sandbox/reservations/{reservation_id}"
+                params = {}
+                json_body = None
+            else:
+                err_msg = f"Unknown tool: {tool_name}"
+                trace_collector.add_event(
+                    event_type=TraceEventType.ERROR,
+                    error_message=err_msg,
+                )
+                return {"error": err_msg, "status_code": 400, "is_success": False}
 
         url = f"{self.base_url}{endpoint}"
 
@@ -132,7 +154,7 @@ class ToolExecutor:
             http_payload=HTTPPayload(
                 method=method,
                 url=url,
-                body=json_body or params,
+                body=json_body if json_body is not None else params,
             ),
         )
 
@@ -148,6 +170,10 @@ class ToolExecutor:
                 response = await client.get(url, params=params, timeout=10.0)
             elif method == "POST":
                 response = await client.post(url, json=json_body, timeout=10.0)
+            elif method == "PUT":
+                response = await client.put(url, json=json_body, timeout=10.0)
+            elif method == "DELETE":
+                response = await client.delete(url, params=params, timeout=10.0)
             else:
                 raise ValueError(f"Unsupported method {method}")
 

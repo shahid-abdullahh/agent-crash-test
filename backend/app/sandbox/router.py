@@ -12,7 +12,7 @@ from app.sandbox.state import sandbox_state
 router = APIRouter(prefix="/sandbox", tags=["Sandbox Travel API"])
 
 
-@router.get("/flights", response_model=List[Flight])
+@router.get("/flights", response_model=List[Flight], operation_id="search_flights")
 def list_flights(
     origin: Optional[str] = Query(None, description="Flight origin airport code, e.g. DEL"),
     destination: Optional[str] = Query(None, description="Flight destination airport code, e.g. BOM"),
@@ -22,19 +22,19 @@ def list_flights(
     return sandbox_state.search_flights(origin=origin, destination=destination, max_price=max_price)
 
 
-@router.get("/flights/{flight_id}", response_model=Flight)
+@router.get("/flights/{flight_id}", response_model=Flight, operation_id="get_flight")
 def get_flight(flight_id: str):
     """Get flight details by ID."""
     return sandbox_state.get_flight(flight_id)
 
 
-@router.post("/reservations", response_model=Reservation)
+@router.post("/reservations", response_model=Reservation, operation_id="create_reservation")
 def create_reservation(payload: ReservationCreateRequest):
     """Create a new flight reservation."""
     return sandbox_state.create_reservation(payload)
 
 
-@router.get("/reservations/{reservation_id}", response_model=Reservation)
+@router.get("/reservations/{reservation_id}", response_model=Reservation, operation_id="get_reservation")
 def get_reservation(reservation_id: str):
     """Get reservation details by reservation ID."""
     return sandbox_state.get_reservation(reservation_id)

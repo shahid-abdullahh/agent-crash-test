@@ -68,7 +68,7 @@ class RunService:
         # 2. Setup trace collector and tool executor
         trace_collector = TraceCollector(run_id=run_id)
         tools = get_travel_tools()
-        tool_executor = ToolExecutor(base_url=self.base_url, client=custom_client)
+        tool_executor = ToolExecutor(base_url=self.base_url, client=custom_client, tools=tools)
 
         # 3. Instantiate and run agent
         agent = DeterministicTravelAgent(retry_policy=request.agent_retry_policy)
