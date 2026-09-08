@@ -8,6 +8,7 @@ import { EvaluationPanel } from './components/EvaluationPanel';
 import { DiagnosisPanel } from './components/DiagnosisPanel';
 import { TraceViewer } from './components/TraceViewer';
 import { ReliabilityOverviewPanel } from './components/ReliabilityOverviewPanel';
+import { BeforeAfterComparisonPanel } from './components/BeforeAfterComparisonPanel';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
 export function App() {
@@ -19,6 +20,7 @@ export function App() {
 
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [currentRun, setCurrentRun] = useState<Run | null>(null);
+  const [recentRuns, setRecentRuns] = useState<Run[]>([]);
   const [reliability, setReliability] = useState<ReliabilityOverview | null>(null);
   const [health, setHealth] = useState<HealthCheckResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -66,6 +68,7 @@ export function App() {
       });
 
       setCurrentRun(run);
+      setRecentRuns((prev) => [run, ...prev.filter((r) => r.id !== run.id)]);
 
       // Refresh reliability metrics
       const updatedRel = await api.getReliability();
@@ -97,6 +100,9 @@ export function App() {
             </button>
           </div>
         )}
+
+        {/* Before / After Remediation Comparison Panel */}
+        <BeforeAfterComparisonPanel recentRuns={recentRuns} currentRun={currentRun} />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Column: Test Configuration & Reliability */}

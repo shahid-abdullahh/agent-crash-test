@@ -80,6 +80,10 @@ class ApiService {
   async getReliability(): Promise<ReliabilityOverview> {
     return this.request<ReliabilityOverview>('/reliability');
   }
+
+  async getComparison(baselineRunId: string, remediatedRunId: string): Promise<any> {
+    return this.request(`/comparison?baseline_run_id=${baselineRunId}&remediated_run_id=${remediatedRunId}`);
+  }
 }
 
 export const api = new ApiService();

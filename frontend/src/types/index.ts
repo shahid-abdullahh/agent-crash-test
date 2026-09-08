@@ -129,3 +129,28 @@ export interface HealthCheckResponse {
   service: string;
   timestamp: string;
 }
+
+export interface RunComparisonSummary {
+  run_id: string;
+  scenario_mode: string;
+  agent_type: string;
+  agent_retry_policy: string;
+  status: string;
+  total_reservations: number;
+  duplicate_reservations: number;
+  is_safe: boolean;
+  trace_events_count: number;
+  duration_ms?: number;
+  failure_category?: string;
+}
+
+export interface RunComparison {
+  baseline_run: RunComparisonSummary;
+  remediated_run: RunComparisonSummary;
+  status_transition: string;
+  side_effect_delta: string;
+  trace_event_delta: number;
+  remediation_strategy: string;
+  remediation_effective: boolean;
+  key_findings: string[];
+}

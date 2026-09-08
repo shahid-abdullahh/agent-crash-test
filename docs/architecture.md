@@ -51,10 +51,12 @@ RELIABILITY ENGINE (Empirical Reliability derived from Runs)
    - Inspects sandbox state snapshot, trace events, and task constraints.
    - Evaluates side-effect safety (e.g. duplicate mutations) and criteria pass/fail states. The LLM's self-reported success is never the source of truth.
 
-6. **Diagnosis (Failure Diagnosis Engine)**:
+6. **Failure Diagnosis & Remediation Comparison**:
    - Identifies failure patterns (such as Ambiguous Timeout followed by Blind Unsafe Retry).
    - Generates actionable remediation recommendations backed by event IDs.
+   - `ComparisonService` calculates differential deltas between baseline and remediated runs.
 
-7. **Persistence Strategy**:
+7. **Persistence Architecture**:
    - `TaskRepository` and `RunRepository` abstraction interfaces.
-   - In-memory implementation for high-speed local testing, ready for PostgreSQL backend adapter.
+   - Dual-mode support: `InMemoryRepository` for zero-setup development, and `SQLTaskRepository` / `SQLRunRepository` (SQLAlchemy async/sync with PostgreSQL / SQLite support) when `DATABASE_URL` is configured.
+

@@ -56,15 +56,18 @@ class RunService:
 
         # 1. Reset sandbox & configure scenario mode
         sandbox_state.reset()
-        if request.scenario_mode == "timeout_after_commit":
-            sandbox_state.configure_scenario(
-                ScenarioConfig(
-                    mode=ScenarioMode.TIMEOUT_AFTER_COMMIT,
-                    fail_first_n_attempts=1,
-                )
+        scenario_enum = ScenarioMode.NORMAL
+        try:
+            scenario_enum = ScenarioMode(request.scenario_mode)
+        except Exception:
+            scenario_enum = ScenarioMode.NORMAL
+
+        sandbox_state.configure_scenario(
+            ScenarioConfig(
+                mode=scenario_enum,
+                fail_first_n_attempts=1,
             )
-        else:
-            sandbox_state.configure_scenario(ScenarioConfig(mode=ScenarioMode.NORMAL))
+        )
 
         # 2. Setup trace collector and tool executor
         trace_collector = TraceCollector(run_id=run_id)
@@ -79,7 +82,16 @@ class RunService:
             from app.agent.providers.openai_compatible import OpenAICompatibleProvider
             agent = LLMAgent(provider=OpenAICompatibleProvider())
         else:
-            agent = DeterministicTravelAgent(retry_policy=request.agent_retry_policy)
+            policy = (
+                "violating_agent"
+                if (
+                    request.agent_type == "violating_agent"
+                    or request.scenario_mode == "constraint_violation"
+                    or request.agent_retry_policy == "violating_agent"
+                )
+                else request.agent_retry_policy
+            )
+            agent = DeterministicTravelAgent(retry_policy=policy)
 
         agent_output = await agent.run(
             task=task,

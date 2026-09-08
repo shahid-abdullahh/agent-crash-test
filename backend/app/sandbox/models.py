@@ -1,12 +1,13 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 from enum import Enum
-from datetime import datetime
 
 
 class ScenarioMode(str, Enum):
     NORMAL = "normal"
     TIMEOUT_AFTER_COMMIT = "timeout_after_commit"
+    INVALID_PARAMETER = "invalid_parameter"
+    CONSTRAINT_VIOLATION = "constraint_violation"
 
 
 class ScenarioConfig(BaseModel):

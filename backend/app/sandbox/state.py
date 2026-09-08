@@ -125,6 +125,15 @@ class SandboxState:
         if flight.available_seats <= 0:
             raise HTTPException(status_code=400, detail=f"No seats available on flight {req.flight_id}")
 
+        # Failure Injection Check: INVALID_PARAMETER (Validation error occurs before state commit)
+        if self.scenario.mode == ScenarioMode.INVALID_PARAMETER:
+            if self.scenario.attempts_seen < self.scenario.fail_first_n_attempts:
+                self.scenario.attempts_seen += 1
+                raise HTTPException(
+                    status_code=422,
+                    detail="Validation Error: Invalid passenger name format (special characters or unverified prefix rejected by carrier API)."
+                )
+
         # Commit reservation in server state
         flight.available_seats -= 1
         res_id = f"RES-{len(self.reservations) + 1:04d}"

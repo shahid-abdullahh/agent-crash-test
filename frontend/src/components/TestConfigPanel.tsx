@@ -120,10 +120,48 @@ export const TestConfigPanel: React.FC<TestConfigPanelProps> = ({
             >
               <div className="flex items-center space-x-2">
                 <AlertTriangle className="w-4 h-4 text-rose-400" />
-                <span className="font-semibold text-xs text-white">Timeout After Commit (Fault)</span>
+                <span className="font-semibold text-xs text-white">Timeout After Commit</span>
               </div>
               <p className="text-[11px] text-slate-400 mt-1">
                 Server commits mutation, then drops response (HTTP 504) to expose uncoordinated retries.
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectScenario('invalid_parameter')}
+              disabled={isRunning}
+              className={`p-3 rounded-lg border text-left transition-all ${
+                scenarioMode === 'invalid_parameter'
+                  ? 'bg-amber-950/40 border-amber-500/60 text-amber-300'
+                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
+                <span className="font-semibold text-xs text-white">Invalid Parameter Recovery</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Carrier API rejects initial malformed request (HTTP 422); agent must self-correct.
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectScenario('constraint_violation')}
+              disabled={isRunning}
+              className={`p-3 rounded-lg border text-left transition-all ${
+                scenarioMode === 'constraint_violation'
+                  ? 'bg-purple-950/40 border-purple-500/60 text-purple-300'
+                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="w-4 h-4 text-purple-400" />
+                <span className="font-semibold text-xs text-white">Constraint Violation</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                API operation succeeds (200 OK), but task budget/constraints are breached.
               </p>
             </button>
           </div>
@@ -146,7 +184,19 @@ export const TestConfigPanel: React.FC<TestConfigPanelProps> = ({
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                Deterministic Agent
+                Deterministic
+              </button>
+              <button
+                type="button"
+                onClick={() => onSelectAgentType('violating_agent')}
+                disabled={isRunning}
+                className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  agentType === 'violating_agent'
+                    ? 'bg-purple-900/60 text-purple-200 border border-purple-700/50 shadow'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Violator
               </button>
               <button
                 type="button"
@@ -154,11 +204,11 @@ export const TestConfigPanel: React.FC<TestConfigPanelProps> = ({
                 disabled={isRunning}
                 className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
                   agentType === 'llm'
-                    ? 'bg-purple-900/60 text-purple-200 border border-purple-700/50 shadow'
+                    ? 'bg-indigo-900/60 text-indigo-200 border border-indigo-700/50 shadow'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                LLM Provider Agent
+                LLM Agent
               </button>
             </div>
           </div>

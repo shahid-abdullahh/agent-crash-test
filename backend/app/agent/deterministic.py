@@ -1,4 +1,5 @@
 import uuid
+import re
 from typing import Dict, Any, List, Optional
 from app.agent.base import BaseAgent
 from app.agent.tools import ToolDefinition, ToolExecutor
@@ -9,11 +10,14 @@ from app.traces.collector import TraceCollector
 
 class DeterministicTravelAgent(BaseAgent):
     """
-    Deterministic Agent that accurately models decision logic for travel tasks.
-    Supports both unsafe retry behavior (reproducing crash vulnerability) and safe retry.
+    Deterministic Agent that models realistic decision logic for travel tasks.
+    Supports:
+      - 'unsafe_retry': Blind retry after ambiguous failure (exposes crash vulnerability)
+      - 'idempotent_retry': Idempotency-Key coordinated retry (safe remediation)
+      - 'violating_agent': Deliberately selects out-of-constraint flight to prove API 200 != Task Success
     """
     def __init__(self, retry_policy: str = "unsafe_retry"):
-        self.retry_policy = retry_policy  # "unsafe_retry" or "idempotent_retry"
+        self.retry_policy = retry_policy
 
     async def run(
         self,
@@ -36,7 +40,7 @@ class DeterministicTravelAgent(BaseAgent):
         search_args = {
             "origin": task.constraints.origin,
             "destination": task.constraints.destination,
-            "max_price": task.constraints.max_price,
+            "max_price": None if self.retry_policy == "violating_agent" else task.constraints.max_price,
         }
         search_res = await tool_executor.execute("search_flights", search_args, trace_collector)
 
@@ -49,14 +53,20 @@ class DeterministicTravelAgent(BaseAgent):
             )
             return {"success": False, "message": msg}
 
-        # Step 2: Choose best flight
-        best_flight = min(flights, key=lambda x: x.get("price", float("inf")))
+        # Step 2: Choose flight (violating agent intentionally chooses over-budget flight)
+        if self.retry_policy == "violating_agent":
+            # Pick flight exceeding budget constraint (e.g. FL-102 at ₹9,200)
+            over_budget_flights = [f for f in flights if f.get("price", 0) > (task.constraints.max_price or 8000)]
+            best_flight = over_budget_flights[0] if over_budget_flights else flights[-1]
+        else:
+            best_flight = min(flights, key=lambda x: x.get("price", float("inf")))
+
         flight_id = best_flight["flight_id"]
 
         trace_collector.add_event(
             event_type=TraceEventType.AGENT_THINKING,
             metadata={
-                "thought": f"Selected cheapest flight {flight_id} at price {best_flight['price']}. Inspecting flight details."
+                "thought": f"Selected flight {flight_id} at price {best_flight['price']}. Inspecting flight details."
             },
         )
 
@@ -88,21 +98,25 @@ class DeterministicTravelAgent(BaseAgent):
         }
         res_result = await tool_executor.execute("create_reservation", booking_args, trace_collector)
 
-        # Step 5: Handle potential failure / timeout / retry
+        # Step 5: Handle potential failure / timeout / parameter error / retry
         if not res_result.get("is_success"):
             status_code = res_result.get("status_code", 500)
             trace_collector.add_event(
                 event_type=TraceEventType.AGENT_THINKING,
                 metadata={
-                    "thought": f"Booking request failed with status {status_code}. Initiating retry as task is not yet confirmed."
+                    "thought": f"Booking request failed with status {status_code}. Initiating recovery/retry."
                 },
             )
 
-            # Unsafe or safe retry
+            # If parameter validation error (422), clean up passenger name
+            clean_passenger_name = passenger_name
+            if status_code == 422:
+                clean_passenger_name = re.sub(r'[^a-zA-Z\s]', '', passenger_name).strip() or "Rahul Sharma"
+
             retry_args = {
                 "flight_id": flight_id,
-                "passenger_name": passenger_name,
-                "idempotency_key": idempotency_key,  # if idempotent, will pass the same key; if unsafe, None
+                "passenger_name": clean_passenger_name,
+                "idempotency_key": idempotency_key,
             }
             res_result = await tool_executor.execute("create_reservation", retry_args, trace_collector)
 
