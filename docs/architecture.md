@@ -7,7 +7,9 @@ Agent Crash Test evaluates autonomous AI agents by testing APIs the way autonomo
 ```text
 TASK (Objectives & Constraints)
   ↓
-AGENT RUNNER (Decision Loop)
+AGENT (DeterministicTravelAgent OR LLMAgent + LLMProvider)
+  ↓
+TOOL DEFINITIONS (Dynamic OpenAPI 3.x Generator)
   ↓
 TOOL EXECUTOR (HTTP Client / Sandbox Bridge)
   ↓
@@ -34,18 +36,25 @@ RELIABILITY ENGINE (Empirical Reliability derived from Runs)
    - Stateful in-memory domain maintaining flights, seats, reservations, and idempotency status.
    - Fault injection engine supporting scenarios such as `normal` and `timeout_after_commit`.
 
-3. **Agent Interface (BaseAgent & Deterministic Agent)**:
-   - Separates agent decision making from tool execution.
-   - Deterministic test agent models realistic tool invocation policies (`unsafe_retry` vs `idempotent_retry`).
+3. **OpenAPI Tool Generation**:
+   - `OpenAPIToolGenerator` reads OpenAPI 3.x specifications and generates standardized `ToolDefinition` instances with resolved parameter and body schemas.
 
-4. **Evaluation (Deterministic Evaluator)**:
+4. **Agent Abstraction & Providers**:
+   - `BaseAgent` interface implemented by:
+     - `DeterministicTravelAgent`: Reproducible test double with configurable retry policies (`unsafe_retry`, `idempotent_retry`).
+     - `LLMAgent`: Autonomous decision loop over OpenAPI tools with strict parameter validation and authorization.
+   - `LLMProvider` interface implemented by:
+     - `MockLLMProvider`: Deterministic action sequences for CI testing.
+     - `OpenAICompatibleProvider`: Standard OpenAI Chat Completions protocol adapter with structured tool calling.
+
+5. **Evaluation (Deterministic Evaluator)**:
    - Inspects sandbox state snapshot, trace events, and task constraints.
-   - Evaluates side-effect safety (e.g. duplicate mutations) and criteria pass/fail states.
+   - Evaluates side-effect safety (e.g. duplicate mutations) and criteria pass/fail states. The LLM's self-reported success is never the source of truth.
 
-5. **Diagnosis (Failure Diagnosis Engine)**:
+6. **Diagnosis (Failure Diagnosis Engine)**:
    - Identifies failure patterns (such as Ambiguous Timeout followed by Blind Unsafe Retry).
    - Generates actionable remediation recommendations backed by event IDs.
 
-6. **Persistence Strategy**:
+7. **Persistence Strategy**:
    - `TaskRepository` and `RunRepository` abstraction interfaces.
    - In-memory implementation for high-speed local testing, ready for PostgreSQL backend adapter.

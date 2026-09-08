@@ -19,3 +19,11 @@
 ## ADR 5: Deterministic, Evidence-Grounded Evaluation & Diagnosis
 - **Decision**: Avoid using an LLM prompt as the sole evaluator. Inspect sandbox state mutations, side-effects, and trace timestamps directly.
 - **Rationale**: Guarantees reproducibility, avoids hallucinated pass/fail judgments, and links diagnosis directly to recorded event IDs.
+
+## ADR 6: Dynamic OpenAPI 3.x Tool Generation
+- **Decision**: Generate `ToolDefinition` instances directly from OpenAPI 3.x specifications via `OpenAPIToolGenerator`.
+- **Rationale**: Removes hardcoded tool-to-route maps, enabling dynamic tool generation for any OpenAPI-compliant API.
+
+## ADR 7: Provider-Independent LLM Agent & Structured Action Contract
+- **Decision**: Implement `LLMProvider` returning validated `AgentAction` instances (`tool_call` or `final`).
+- **Rationale**: Decouples the decision loop from model vendors. The `LLMAgent` enforces tool authorization and parameter validation before dispatching to `ToolExecutor`.

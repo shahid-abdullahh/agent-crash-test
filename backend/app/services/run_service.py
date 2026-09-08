@@ -34,6 +34,7 @@ class RunService:
         self,
         request: RunCreateRequest,
         custom_client: Optional[httpx.AsyncClient] = None,
+        custom_agent: Optional[Any] = None,
     ) -> Run:
         task = self.task_service.get_task(request.task_id)
         if not task:
@@ -71,7 +72,15 @@ class RunService:
         tool_executor = ToolExecutor(base_url=self.base_url, client=custom_client, tools=tools)
 
         # 3. Instantiate and run agent
-        agent = DeterministicTravelAgent(retry_policy=request.agent_retry_policy)
+        if custom_agent:
+            agent = custom_agent
+        elif request.agent_type == "llm":
+            from app.agent.llm_agent import LLMAgent
+            from app.agent.providers.openai_compatible import OpenAICompatibleProvider
+            agent = LLMAgent(provider=OpenAICompatibleProvider())
+        else:
+            agent = DeterministicTravelAgent(retry_policy=request.agent_retry_policy)
+
         agent_output = await agent.run(
             task=task,
             tools=tools,
