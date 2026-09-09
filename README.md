@@ -1,4 +1,4 @@
-# Agent Crash Test 💥
+# Agent Crash Test 
 
 > **"Test APIs the way autonomous agents actually use them."**
 
