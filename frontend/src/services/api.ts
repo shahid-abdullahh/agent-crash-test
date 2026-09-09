@@ -61,6 +61,10 @@ class ApiService {
     });
   }
 
+  async getRuns(): Promise<Run[]> {
+    return this.request<Run[]>('/runs');
+  }
+
   async getRun(runId: string): Promise<Run> {
     return this.request<Run>(`/runs/${runId}`);
   }

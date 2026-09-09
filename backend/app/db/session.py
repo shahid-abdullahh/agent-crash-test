@@ -11,8 +11,11 @@ SessionLocal = None
 
 if DATABASE_URL:
     # Ensure sync URL format for standard engine
-    connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-    engine = create_engine(DATABASE_URL, echo=False, connect_args=connect_args)
+    sync_db_url = DATABASE_URL
+    if sync_db_url.startswith("postgresql+asyncpg://"):
+        sync_db_url = sync_db_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+    connect_args = {"check_same_thread": False} if sync_db_url.startswith("sqlite") else {}
+    engine = create_engine(sync_db_url, echo=False, connect_args=connect_args)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

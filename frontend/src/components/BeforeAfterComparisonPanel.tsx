@@ -18,20 +18,44 @@ export const BeforeAfterComparisonPanel: React.FC<BeforeAfterComparisonPanelProp
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto populate if possible
+  // Auto load runs from API if none passed, or auto populate
   React.useEffect(() => {
-    if (recentRuns.length >= 2) {
-      const failed = recentRuns.find((r) => r.status === 'failed' || (r.evaluation && !r.evaluation.success));
-      const passed = recentRuns.find((r) => r.status === 'completed' && r.evaluation && r.evaluation.success);
-      if (failed && !baselineId) setBaselineId(failed.id);
-      if (passed && !remediatedId) setRemediatedId(passed.id);
-    } else if (currentRun) {
-      if (currentRun.status === 'failed' && !baselineId) {
-        setBaselineId(currentRun.id);
-      } else if (currentRun.status === 'completed' && !remediatedId) {
-        setRemediatedId(currentRun.id);
+    const initRuns = async () => {
+      let runs = recentRuns;
+      if (runs.length < 2) {
+        try {
+          const apiRuns = await api.getRuns();
+          if (apiRuns && apiRuns.length > 0) {
+            runs = apiRuns;
+          }
+        } catch (e) {
+          // ignore
+        }
       }
-    }
+
+      const failed = runs.find((r) => r.status === 'failed' || (r.evaluation && !r.evaluation.success));
+      const passed = runs.find((r) => r.status === 'completed' && r.evaluation && r.evaluation.success);
+      
+      const bId = failed ? failed.id : (runs[1]?.id || '');
+      const rId = passed ? passed.id : (runs[0]?.id || '');
+
+      if (bId) setBaselineId(bId);
+      if (rId) setRemediatedId(rId);
+
+      if (bId && rId && bId !== rId) {
+        try {
+          setIsLoading(true);
+          const res = await api.getComparison(bId, rId);
+          setComparison(res);
+        } catch (err) {
+          // ignore
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    initRuns();
   }, [recentRuns, currentRun]);
 
   const handleCompare = async () => {
@@ -52,10 +76,6 @@ export const BeforeAfterComparisonPanel: React.FC<BeforeAfterComparisonPanelProp
       setIsLoading(false);
     }
   };
-
-  if (recentRuns.length < 2 && !comparison) {
-    return null; // Don't clutter until at least 2 runs exist
-  }
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4">
